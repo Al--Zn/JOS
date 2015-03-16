@@ -939,7 +939,7 @@ show_map_region(uintptr_t start_va, uintptr_t end_va)
 	end_va &= ~0xfff;
 
 	cprintf("Virt Addr     Phys Addr     Permission\n");
-	for (va = start_va; va <= end_va; va += PGSIZE) {
+	for (va = start_va; va <= end_va && va >= start_va; va += PGSIZE) {
 		pteptr = pgdir_walk(kern_pgdir, (const void *)va, 0);
 		cprintf("0x%08x    ", va);
 		if (!pteptr || !*pteptr) {
@@ -948,23 +948,23 @@ show_map_region(uintptr_t start_va, uintptr_t end_va)
 		}
 		cprintf("0x%08x    |", PTE_ADDR(*pteptr));
 		if (*pteptr & PTE_G)
-			cprintf("G|");
+			cprintf("PTE_G|");
 		if (*pteptr & PTE_PS)
-			cprintf("PS|");
+			cprintf("PTE_PS|");
 		if (*pteptr & PTE_D)
-			cprintf("D|");
+			cprintf("PTE_D|");
 		if (*pteptr & PTE_A)
-			cprintf("A|");
+			cprintf("PTE_A|");
 		if (*pteptr & PTE_PCD)
-			cprintf("PCD|");
+			cprintf("PTE_PCD|");
 		if (*pteptr & PTE_PWT)
-			cprintf("PWT|");
+			cprintf("PTE_PWT|");
 		if (*pteptr & PTE_U)
-			cprintf("U|");
+			cprintf("PTE_U|");
 		if (*pteptr & PTE_W)
-			cprintf("W|");
+			cprintf("PTE_W|");
 		if (*pteptr & PTE_P)
-			cprintf("P|");
+			cprintf("PTE_P|");
 		cprintf("\n");	
 	}
 

@@ -126,6 +126,8 @@ mon_showmappings(int argc, char **argv, struct Trapframe *tf)
 			end_va -= '0'; 
 	}
 
+	if (start_va > end_va)
+		goto showmappings_bad;
 	show_map_region(start_va, end_va);
 	return 0;
 showmappings_bad:
