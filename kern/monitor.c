@@ -10,6 +10,7 @@
 #include <kern/console.h>
 #include <kern/monitor.h>
 #include <kern/kdebug.h>
+#include <kern/pmap.h>
 
 #define CMDBUF_SIZE	80	// enough for one VGA text line
 
@@ -24,6 +25,7 @@ struct Command {
 static struct Command commands[] = {
 	{ "help", "Display this list of commands", mon_help },
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
+	{ "showmappings", "Display information about page mappings between [start_va, end_va]", mon_showmappings }
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
@@ -85,7 +87,52 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 	return 0;
 }
 
+int
+mon_showmappings(int argc, char **argv, struct Trapframe *tf)
+{
+	size_t i, j, len;
+	uintptr_t start_va, end_va, va;
+	pte_t *pteptr;
+	// check the parameter num
+	if (argc != 3)
+		goto showmappings_bad;
+	// check start_va
+	start_va = 0;
+	len = strlen(argv[1]);
+	if (len > 10 || len < 3 || !(argv[1][0] == '0' && argv[1][1] == 'x'))
+		goto showmappings_bad;
+	for (i = 2; i < 10 && i < len; ++i) {
+		start_va = start_va * 16 + argv[1][i];
+		if (argv[1][i] >= 'a' && argv[1][i] <= 'z')
+			start_va -= 'a' - 10;
+		else if (argv[1][i] >= 'A' && argv[1][i] <= 'Z')
+			start_va -= 'A' - 10;
+		else if (argv[1][i] >= '0' && argv[1][i] <= '9')
+			start_va -= '0'; 
+	}
 
+	// check end_va
+	end_va = 0;
+	len = strlen(argv[2]);
+	if (len > 10 || len < 3 || !(argv[2][0] == '0' && argv[2][1] == 'x'))
+		goto showmappings_bad;
+	for (i = 2; i < 10 && i < len; ++i) {
+		end_va = end_va * 16 + argv[2][i];
+		if (argv[2][i] >= 'a' && argv[2][i] <= 'z')
+			end_va -= 'a' - 10;
+		else if (argv[2][i] >= 'A' && argv[2][i] <= 'Z')
+			end_va -= 'A' - 10;
+		else if (argv[2][i] >= '0' && argv[2][i] <= '9')
+			end_va -= '0'; 
+	}
+
+	show_map_region(start_va, end_va);
+	return 0;
+showmappings_bad:
+	cprintf("showmappings: \033[31millegal arguments\033[0m\n");
+	cprintf("usage: showmappings start_va end_va (Eg. showmappings 0x300 0x500)\n");
+	return -1;
+}
 
 /***** Kernel monitor command interpreter *****/
 
