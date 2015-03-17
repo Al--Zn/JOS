@@ -2,21 +2,9 @@ Lab 2: Memory Management实习报告
 ===================
 1100016639 信息科学技术学院 吕鑫
 
----
 
-- [总体概述](#总体概述)
-- [完成情况](#完成情况)
-	- [任务完成列表](#任务完成列表)
-	- [Part 1: Physical Page Management](#part-1-physical-page-management)
-			- [Exercise 1](#exercise-1)
-    - [Part 2: Virtual Memory](#part-2-virtual-memory)
-		- [Virtual, Linear, and Physical Addresses](#virtual-linear-and-physical-addresses)
-			- [Exercise 3](#exercise-3)
-			- [Question](#question)
-		- [Reference counting](#reference-counting)
-		- [Page Table Management](#page-table-management)
-- [感想与收获](#感想与收获)
-- [参考资料](#参考资料)
+
+
 
 
 ----
@@ -33,15 +21,17 @@ Lab 2: Memory Management实习报告
 完成情况
 -------------------
 
-----
-### 任务完成列表
-Exercise 1|Exercise 2|Exercise 3|Exercise 4|Exercise 5|Exercise 6|
-:--:|:--:|:--:|:--:|:--:|:--:|
-√   | √  | √  | √  | √  | √  |
 
-Exercise 7|Exercise 8| Challenge | Exercise 9|Exercise 10|Exercise 11|
-:--:|:--:|:--:|:--:|:--:|:--:|
-√   | √  | √  | √  | √  |√  |
+### 任务完成列表
+
+|Exercise 1|Exercise 2|Exercise 3|Exercise 4|Exercise 5|Exercise 6|
+|:--:|:--:|:--:|:--:|:--:|:--:|
+|√   | √  | √  | √  | √  | √  |
+
+
+|Exercise 7|Exercise 8| Challenge | Exercise 9|Exercise 10|Exercise 11|
+|:--:|:--:|:--:|:--:|:--:|:--:|
+|√   | √  | √  | √  | √  |√  |
 
 
 ----
@@ -141,6 +131,7 @@ boot_alloc(uint32_t n)
   前三项都有明确的变量、宏帮助定位，而第四项如何确定呢？只需要`boot_alloc(0)`即可，它会返回当前下一块空闲内存的初始地址（虚拟地址），我们将这个地址减去`KERNBASE`，就知道内核当前占用了多少内存了。再然后，目前的内存映射机制是把虚拟地址`[KERNBASE, KERNBASE + 4MB)`映射到物理地址`[0, 4MB)`上，所以这个差值实际上就是下一块空闲内存的实际物理地址。
 
   综上，对于空闲内存，我们初始化它的引用数为0，并加入到空闲链表中。而已占用的内存，根据注释，它们的引用数没有意义，无需初始化。具体代码如下：
+  
   ```c
   void
 page_init(void)
@@ -299,7 +290,7 @@ value变量是`char *`类型的，这是一个虚拟地址，显然`x`也是，�
 
  需要注意的地方是，在创建页表项使用`page_alloc()`后，需立即将这个页的`pp_ref`加1。
 
- ```
+ ```cpp
 pte_t *
 pgdir_walk(pde_t *pgdir, const void *va, int create)
 {
@@ -335,7 +326,7 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 
   这个函数完成了虚拟地址到物理地址的映射过程，它将`[va, va + size)`的虚拟地址空间映射到`[pa, pa + size)`的物理地址空间。利用`boot_map_region()`函数很容易实现这个映射。
 
- ```
+ ```cpp
 static void
 boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm)
 {
@@ -358,7 +349,7 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 
  这个函数根据传入的虚拟地址`va`返回它映射的物理页信息，同样利用`pgdir_walk()`很容易实现。
 
-  ```
+  ```cpp
   struct PageInfo *
 page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 {
@@ -378,7 +369,7 @@ page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 
   这个函数取消虚拟地址`va`对应的物理页的映射关系，利用`page_lookup()`找到这个物理页，并使它无效即可，注意同时要将tlb中的对应条目无效化。
 
- ```
+ ```cpp
 void
 page_remove(pde_t *pgdir, void *va)
 {
@@ -400,7 +391,7 @@ page_remove(pde_t *pgdir, void *va)
 
  需要注意的一点就是，在调用`page_remove()`取消映射后，有可能那个物理页变为了空闲页被加入链表中，这样如果我们重新映射相同的地址，一定要**检查链表头是否是刚刚释放的物理页**，否则空闲链表的维护将会出错。
 
- ```
+ ```cpp
  int
 page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 {
@@ -452,7 +443,7 @@ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 
 代码：
 
-```C
+```cpp
 	//////////////////////////////////////////////////////////////////////
 	// Now we set up virtual memory
 
@@ -467,7 +458,7 @@ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 
 接下来是内核栈空间的映射，和刚刚类似的方法，将`[KSTACKTOP - KSTKSIZE, KSTACKTOP)`映射到`bootstack`所映射的同一块物理地址上。
 
-```
+```cpp
 	//////////////////////////////////////////////////////////////////////
 	// Use the physical memory that 'bootstack' refers to as the kernel
 	// stack.  The kernel stack grows down from virtual address KSTACKTOP.
@@ -485,7 +476,7 @@ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 
 `2^32 - KERNBASE = (2^32 - KERNBASE) % 2^32 = -KERNBASE`
 
-```
+```cpp
 	//////////////////////////////////////////////////////////////////////
 	// Map all of physical memory at KERNBASE.
 	// Ie.  the VA range [KERNBASE, 2^32) should map to
@@ -507,10 +498,10 @@ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 
  利用QEMU Monitor的`info pg`命令，可以很清楚地看到哪几个Page Directory已经有了值，就可以轻松填写该表格了。
 
- <img src="http://ww4.sinaimg.cn/large/69cb49bcjw1eq6cnqmd84j20mc0evdjf.jpg" width="70%"/>
+<img src="http://ww4.sinaimg.cn/large/69cb49bcjw1eq90yt9i6qj20mc0ev0w4.jpg" width="70%" />
 
-  Entry	| Base Virtual Address	| Points to (logically) |
-:--- | :--- | :---
+ Entry	| Base Virtual Address	| Points to (logically) |
+|:--- | :--- | :---
 1023	| 0xffc00000	| Page table for top 4MB of phys memory
 ...| ... | ...
 960	| 0xf0000000	| Page table for `[0x0, 0x003fffff)` phys memory 
@@ -555,7 +546,7 @@ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 
 至于为什么在打开分页机制后，我们还能在原来的低地址`%eip`上继续正常运行，是因为`entrypgdir.c`中将两段虚拟地址空间`[0, 4MB)`和`[KERNBASE, KERNBASE + 4MB)`映射到同一个物理地址空间`[0, 4MB)`：
 
-```
+```cpp
 pde_t entry_pgdir[NPDENTRIES] = {
 	// Map VA's [0, 4MB) to PA's [0, 4MB)
 	[0]
@@ -569,31 +560,306 @@ pde_t entry_pgdir[NPDENTRIES] = {
 这样映射，打开了分页机制后，低地址被还是被映射到了与原来相同的物理地址，因此能够正确执行。
 
 ##### Challenge 1
-> We consumed many physical pages to hold the page tables for the KERNBASE mapping. Do a more space-efficient job using the PTE_PS ("Page Size") bit in the page directory entries. This bit was not supported in the original 80386, but is supported on more recent x86 processors. You will therefore have to refer to Volume 3 of the current Intel manuals. Make sure you design the kernel to use this optimization only on processors that support it!
+> We consumed many physical pages to hold the page tables for the KERNBASE mapping. Do a more space-efficient job using the **PTE_PS** ("Page Size") bit in the page directory entries. This bit was not supported in the original 80386, but is supported on more recent x86 processors. You will therefore have to refer to **Volume 3 of the current Intel manuals**. Make sure you design the kernel to use this optimization only on processors that support it!
 
 
+Intel手册中对4MB页表的实现有着详细的说明，一个使用了4MB页的虚拟地址的寻址方式为：从虚拟地址的前10位得到页目录偏移（Page Directory Index），之后从一级页表（Page Directory）到页目录项。最后从页目录项中的前10位取得物理页起始地址，从虚拟地址的后22位取得页偏移（Offset），两者一加就是最终的物理地址。结合下面两张图便很容易理解。
+
+4MB页寻址方式：
+
+<img src="http://ww1.sinaimg.cn/large/69cb49bcjw1eq8ikdlk7qj20ua0gs40d.jpg" width="70%"/>
+
+4MB页表结构：
+
+<img src="http://ww4.sinaimg.cn/large/69cb49bcjw1eq8ise4kb4j20tk0gyjub.jpg" width="70%"/>
+
+为此在JOS中新定义了几个宏来方便管理4MB页：
+
+```cpp
+// bytes mapped by a larger page (4MB)
+#define LPGSIZE		4194304
+
+// offset in 4MB page
+#define LPGOFF(la)  (((uintptr_t)(la)) & 0x003FFFFF)
+
+// Address in 4MB page table
+#define LPTE_ADDR(lpte) ((physaddr_t)(lpte) & 0xFFC00000)
+```
+
+那么要修改哪些函数才能实现4MB页表呢？从4KB到4MB页表，实际上是映射方式的改变，因此我们修改`boot_map_region()`函数：
+
+```cpp
+static void
+boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm)
+{
+	size_t i;
+	pte_t *pte;
+
+	// 4MB pages mapping
+	if (perm & PTE_PS) {
+		for (i = 0; i < size; i += LPGSIZE) {
+			pte = pgdir + PDX(va + i);
+			if (pte) {
+				*pte = (pa + i) | perm | PTE_P;
+			}
+		}
+		return;
+	}
+	// 4KB pages mapping
+	for (i = 0; i < size; i += PGSIZE) {
+		// get the pte 
+		pte = pgdir_walk(kern_pgdir, (char *)(va + i), 1);
+		// write the pte entry 
+		if (pte != NULL) {
+			*pte = (pa + i) | perm | PTE_P;
+		}
+
+	}
+}
+
+```
+
+还有一个`checkva2pa()`函数有必要改，这个函数根据给定的虚拟地址，在页表中查询，返回对应的物理地址。由于使用了4MB大页，寻址方式相应地发生了改变，因此需要修改：
+
+```
+static physaddr_t
+check_va2pa(pde_t *pgdir, uintptr_t va)
+{
+	pte_t *p;
+
+	pgdir = &pgdir[PDX(va)];
+	if (!(*pgdir & PTE_P))
+		return ~0;
+	// 4MB pages
+	if (*pgdir & PTE_PS)
+		return LPTE_ADDR(*pgdir) | LPGOFF(va);
+	// 4KB pages
+	p = (pte_t*) KADDR(PTE_ADDR(*pgdir));
+	if (!(p[PTX(va)] & PTE_P))
+		return ~0;
+	return PTE_ADDR(p[PTX(va)]);
+}
+```
+
+之后运行`make grade`，没有任何问题，全部通过。
+
+```
+running JOS: (1.1s) 
+  Physical page allocator: OK 
+  Page management: OK 
+  Kernel page directory: OK 
+  Page management 2: OK 
+Score: 70/70
+```
+
+
+----
 ##### Challenge 2
-> Extend the JOS kernel monitor with commands to:
+> **Extend the JOS kernel monitor with commands to:**
+ 
 
-> - Display in a useful and easy-to-read format all of the physical page mappings (or lack thereof) that apply to a particular range of virtual/linear addresses in the currently active address space. For example, you might enter **showmappings 0x3000 0x5000** to display the physical page mappings and corresponding permission bits that apply to the pages at virtual addresses 0x3000, 0x4000, and 0x5000.
-- Explicitly set, clear, or change the permissions of any mapping in the current address space.
-- Dump the contents of a range of memory given either a virtual or physical address range. Be sure the dump code behaves correctly when the range extends across page boundaries!
-- Do anything else that you think might be useful later for debugging the kernel. (There's a good chance it will be!)
+
+> Display in a useful and easy-to-read format all of the physical page mappings (or lack thereof) that apply to a particular range of virtual/linear addresses in the currently active address space. For example, you might enter **showmappings 0x3000 0x5000** to display the physical page mappings and corresponding permission bits that apply to the pages at virtual addresses 0x3000, 0x4000, and 0x5000.
+
+很直观，我的实现方法是先在`monitor.c`中注册一个`mon_showmappings()`函数，里面先进行参数检查，无误后调用`pmap.c`中的`show_map_region()`函数来打印结果。
+
+ `mon_showmappings()`主要就是参数检查，就不贴了，主要是`show_map_region()`函数：
+
+```cpp
+void
+show_map_region(uintptr_t start_va, uintptr_t end_va)
+{
+    
+    uintptr_t va;
+    pte_t *pteptr;
+    start_va &= ~0xfff;
+    end_va &= ~0xfff;
+
+    cprintf("Virt Addr     Phys Addr     Permission\n");
+    for (va = start_va; va <= end_va && va >= start_va; va += PGSIZE) {
+        pteptr = pgdir_walk(kern_pgdir, (const void *)va, 0);
+        cprintf("0x%08x    ", va);
+        if (!pteptr || !*pteptr) {
+            cprintf("Not mapped\n");
+            continue;
+        }
+        cprintf("0x%08x    |", PTE_ADDR(*pteptr));
+        if (*pteptr & PTE_G)
+            cprintf("PTE_G|");
+        if (*pteptr & PTE_PS)
+            cprintf("PTE_PS|");
+        if (*pteptr & PTE_D)
+            cprintf("PTE_D|");
+        if (*pteptr & PTE_A)
+            cprintf("PTE_A|");
+        if (*pteptr & PTE_PCD)
+            cprintf("PTE_PCD|");
+        if (*pteptr & PTE_PWT)
+            cprintf("PTE_PWT|");
+        if (*pteptr & PTE_U)
+            cprintf("PTE_U|");
+        if (*pteptr & PTE_W)
+            cprintf("PTE_W|");
+        if (*pteptr & PTE_P)
+            cprintf("PTE_P|");
+        cprintf("\n");  
+    }
+
+} 
+```
+
+效果如下：
+
+<img src="http://ww3.sinaimg.cn/large/69cb49bcjw1eq8khqwnifj20mc0ev42q.jpg" width="70%"/>
+
+
+>  Explicitly set, clear, or change the permissions of any mapping in the current address space.
+
+跟之前一样，在`monitor.c`中建立`mon_setperm()`检查参数，调用`pmap.c`中的`setperm()`来实现。实现很简单，用`pgdir_walk()`找到对应的pte，直接更改权限即可。
+
+```cpp
+void
+setperm(uintptr_t va, int perm)
+{
+    pte_t *pteptr;
+    int old_perm, i;
+    va = ROUNDDOWN(va, PGSIZE);
+    pteptr = pgdir_walk(kern_pgdir, (const void *)va, 0);
+    cprintf("Virt Addr: 0x%08x\nPermissions: \n", va);
+    if (!pteptr) {
+        cprintf("Not mapped\n");
+        return;
+    }
+    
+    for (i = 0; i < 2; ++i, *pteptr = (*pteptr & ~0xFFF) | perm) {
+        if (i == 0)
+            cprintf("Old: ");
+        else
+            cprintf("New: ");
+        cprintf("|");
+        if (*pteptr & PTE_G)
+            cprintf("PTE_G|");
+        if (*pteptr & PTE_PS)
+            cprintf("PTE_PS|");
+        if (*pteptr & PTE_D)
+            cprintf("PTE_D|");
+        if (*pteptr & PTE_A)
+            cprintf("PTE_A|");
+        if (*pteptr & PTE_PCD)
+            cprintf("PTE_PCD|");
+        if (*pteptr & PTE_PWT)
+            cprintf("PTE_PWT|");
+        if (*pteptr & PTE_U)
+            cprintf("PTE_U|");
+        if (*pteptr & PTE_W)
+            cprintf("PTE_W|");
+        if (*pteptr & PTE_P)
+            cprintf("PTE_P|");
+        cprintf("\n");
+    }
+}
+```
+
+效果如下：
+
+<img src="http://ww3.sinaimg.cn/large/69cb49bcjw1eq8np8wrbij20j00evdhl.jpg" width="70%"/>
+
+> Dump the contents of a range of memory given either a virtual or physical address range. Be sure the dump code behaves correctly when the range extends across page boundaries!
+
+对于虚拟地址很简单，检查该虚拟地址所在页的`PTE_P`是否被设置，若被设置则直接输出该地址上的值即可。
+
+```cpp
+void
+dump_virtaddr(uintptr_t start_va, uintptr_t end_va)
+{
+    int *va;
+    pte_t *pteptr;
+    start_va = ROUNDDOWN(start_va, 4);
+    end_va = ROUNDDOWN(end_va, 4);
+    for (va = (int*)start_va; va <= (int*)end_va; ++va) {
+        cprintf("0x%08x:", va);
+        pteptr = pgdir_walk(kern_pgdir, (const void *)va, 0);
+        if (!pteptr || !(*pteptr & PTE_P)) {
+            cprintf(" 0x????????\n");
+        } else {
+            cprintf(" 0x%08x\n", *va);
+        }
+    }
+}
+```
+
+而对于物理地址则比较麻烦，因为分页机制已经开启，需要遍历页表来找到物理地址对应的虚拟地址才能输出。好在已经有了三块区域已经做了静态映射，因此根据静态映射来还原虚拟地址即可：
+
+```cpp
+void
+dump_physaddr(physaddr_t start_pa, physaddr_t end_pa)
+{
+    uintptr_t va;
+    physaddr_t pa;
+    pte_t *pteptr;
+
+    start_pa = ROUNDDOWN(start_pa, 4);
+    end_pa = ROUNDDOWN(end_pa, 4);
+    cprintf("%d %d\n", start_pa, end_pa);
+    for (pa = start_pa; pa <= end_pa; pa += 4) {
+        cprintf("0x%08x:", pa);
+        if (pa < -KERNBASE)
+            va = pa + KERNBASE;
+        else if (pa >= PADDR(bootstack) && pa < PADDR(bootstack) + KSTKSIZE) {
+            va = pa - PADDR(bootstack) + KSTACKTOP - KSTKSIZE;
+        }
+        else if (pa >= PADDR(pages) && pa < PADDR(pages) + PTSIZE) {
+            va = pa - PADDR(pages) + UPAGES;
+        } else {
+            cprintf(" 0x????????\n");
+            continue;
+        }
+
+        pteptr = pgdir_walk(kern_pgdir, (const void *)va, 0);
+        if (!pteptr || !(*pteptr & PTE_P)) {
+            cprintf(" 0x????????\n");
+        } else {
+            cprintf(" 0x%08x\n", *(int*)va);
+        }
+    }
+}
+```
+
+效果如下，测试了一块静态映射的区域，可见两种方式的结果是相同的：
+
+<img src="http://ww4.sinaimg.cn/large/69cb49bcgw1eq8ph5ukb7j20j00evdhz.jpg" width="70%"/>
+
+
+> Do anything else that you think might be useful later for debugging the kernel. (There's a good chance it will be!)
+
+I think nothing else might be useful later.
+
+ 
 
 ---
 #### Address Space Layout Alternatives
 
+##### Challenge 3
+> Write up an outline of how a kernel could be designed to allow user environments unrestricted use of the full 4GB virtual and linear address space. Hint: the technique is sometimes known as "follow the bouncing kernel." In your design, be sure to address exactly what has to happen when the processor transitions between kernel and user modes, and how the kernel would accomplish such transitions. Also describe how the kernel would access physical memory and I/O devices in this scheme, and how the kernel would access a user environment's virtual address space during system calls and the like. Finally, think about and describe the advantages and disadvantages of such a scheme in terms of flexibility, performance, kernel complexity, and other factors you can think of.
+
+I can think of nothing.
+
+##### Challenge 4
+> Since our JOS kernel's memory management system only allocates and frees memory on page granularity, we do not have anything comparable to a general-purpose **malloc/free** facility that we can use within the kernel. This could be a problem if we want to support certain types of I/O devices that require physically contiguous buffers larger than 4KB in size, or if we want user-level environments, and not just the kernel, to be able to allocate and map 4MB superpages for maximum processor efficiency. (See the earlier challenge problem about **PTE_PS**.)
+
+**伙伴系统（Buddy System）**可以用来解决这个问题。
+
+**思想**：将空闲内存分为大小为2的幂次的块。在申请一段内存空间 $n$ 时，先计算满足 $2^i >= n$ 最小的 $i$ ，寻找大小为 $2^i$ 的空闲块分配给它。若没有，则往上寻找空闲块，直到找到大小为 $2^j(j >i)$ 的空闲块，递归地将它分成两半，直到大小等于 $2^i$ ，最后分配这块大小为 $2^i$ 的空闲块即可。
+
+**实现**：ICS Memory Lab已经辛苦地实现过了，这里就不实现了。。
+
 ----
 感想与收获
 -------------
-本次实验总体感觉难度不大，但是每一部分做得很细，很注重基础。
-
-虽然只是第一个Lab，但是由于我对汇编语言、gdb、objdump等知识太久不用过于生疏，还是做了很长时间。好在通过本次Lab，我不仅恶补了一下这些有用的工具的使用方法，同时也将ICS、计算机组成、操作系统等相关课程的知识重新回顾了一下，抢救回来了几乎快忘记的知识。这就是我做Lab 1最大的收获。
+煞笔Lab解散算了
 
 ---
 参考资料
 -------------
-1. **操作系统JOS实习第一次报告**，张弛
+1. **操作系统JOS实习第二次报告**，张弛
 2. **Computer Systems: A Programmer's Perspective, Second Edition**, Randal E. Bryant and David R O'Hallaron.
-3. [Using Stabs in Their Own Sections](https://sourceware.org/gdb/onlinedocs/stabs/Stab-Sections.html#Stab-Sections)
-4. [ANSI Escape Characters](http://www.wikiwand.com/en/ANSI_escape_code)
