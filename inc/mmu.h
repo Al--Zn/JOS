@@ -37,7 +37,8 @@
 
 // offset in page
 #define PGOFF(la)	(((uintptr_t) (la)) & 0xFFF)
-
+// offset in 4MB page
+#define LPGOFF(la)  (((uintptr_t)(la)) & 0x003FFFFF)
 // construct linear address from indexes and offset
 #define PGADDR(d, t, o)	((void*) ((d) << PDXSHIFT | (t) << PTXSHIFT | (o)))
 
@@ -46,7 +47,8 @@
 #define NPTENTRIES	1024		// page table entries per page table
 
 #define PGSIZE		4096		// bytes mapped by a page
-#define PGSHIFT		12		// log2(PGSIZE)
+#define PGSHIFT		12			// log2(PGSIZE)
+#define LPGSIZE		4194304		// bytes mapped by a larger page (4MB)
 
 #define PTSIZE		(PGSIZE*NPTENTRIES) // bytes mapped by a page directory entry
 #define PTSHIFT		22		// log2(PTSIZE)
@@ -74,6 +76,8 @@
 
 // Address in page table or page directory entry
 #define PTE_ADDR(pte)	((physaddr_t) (pte) & ~0xFFF)
+// Address in 4MB page table
+#define LPTE_ADDR(lpte) ((physaddr_t)(lpte) & 0xFFC00000)
 
 // Control Register flags
 #define CR0_PE		0x00000001	// Protection Enable
