@@ -192,8 +192,8 @@ mem_init(void)
     // we just set up the mapping anyway.
     // Permissions: kernel RW, user NONE
     // Your code goes here:
-    boot_map_region(kern_pgdir, KERNBASE, ~0 - KERNBASE + 1, 0, PTE_W | PTE_P | PTE_PS);
-    
+    // boot_map_region(kern_pgdir, KERNBASE, ~0 - KERNBASE + 1, 0, PTE_W | PTE_P | PTE_PS);
+    boot_map_region(kern_pgdir, KERNBASE, ~0 - KERNBASE + 1, 0, PTE_W | PTE_P);
     // Check that the initial page directory has been set up correctly.
     check_kern_pgdir();
 
@@ -987,8 +987,94 @@ show_map_region(uintptr_t start_va, uintptr_t end_va)
 
 }
 
+
+void
+setperm(uintptr_t va, int perm)
+{
+    pte_t *pteptr;
+    int old_perm, i;
+    va = ROUNDDOWN(va, PGSIZE);
+    pteptr = pgdir_walk(kern_pgdir, (const void *)va, 0);
+    cprintf("Virt Addr: 0x%08x\nPermissions: \n", va);
+    if (!pteptr) {
+        cprintf("Not mapped\n");
+        return;
+    }
+    
+    for (i = 0; i < 2; ++i, *pteptr = (*pteptr & ~0xFFF) | perm) {
+        if (i == 0)
+            cprintf("Old: ");
+        else
+            cprintf("New: ");
+        cprintf("|");
+        if (*pteptr & PTE_G)
+            cprintf("PTE_G|");
+        if (*pteptr & PTE_PS)
+            cprintf("PTE_PS|");
+        if (*pteptr & PTE_D)
+            cprintf("PTE_D|");
+        if (*pteptr & PTE_A)
+            cprintf("PTE_A|");
+        if (*pteptr & PTE_PCD)
+            cprintf("PTE_PCD|");
+        if (*pteptr & PTE_PWT)
+            cprintf("PTE_PWT|");
+        if (*pteptr & PTE_U)
+            cprintf("PTE_U|");
+        if (*pteptr & PTE_W)
+            cprintf("PTE_W|");
+        if (*pteptr & PTE_P)
+            cprintf("PTE_P|");
+        cprintf("\n");
+    }
+
+}
 void
 dump_virtaddr(uintptr_t start_va, uintptr_t end_va)
 {
-    
+    int *va;
+    pte_t *pteptr;
+    start_va = ROUNDDOWN(start_va, 4);
+    end_va = ROUNDDOWN(end_va, 4);
+    for (va = (int*)start_va; va <= (int*)end_va; ++va) {
+        cprintf("0x%08x:", va);
+        pteptr = pgdir_walk(kern_pgdir, (const void *)va, 0);
+        if (!pteptr || !(*pteptr & PTE_P)) {
+            cprintf(" 0x????????\n");
+        } else {
+            cprintf(" 0x%08x\n", *va);
+        }
+    }
+}
+
+void
+dump_physaddr(physaddr_t start_pa, physaddr_t end_pa)
+{
+    uintptr_t va;
+    physaddr_t pa;
+    pte_t *pteptr;
+
+    start_pa = ROUNDDOWN(start_pa, 4);
+    end_pa = ROUNDDOWN(end_pa, 4);
+    for (pa = start_pa; pa <= end_pa; pa += 4) {
+        cprintf("0x%08x:", pa);
+        if (pa < -KERNBASE)
+            va = pa + KERNBASE;
+        else if (pa >= PADDR(bootstack) && pa < PADDR(bootstack) + KSTKSIZE) {
+            va = pa - PADDR(bootstack) + KSTACKTOP - KSTKSIZE;
+        }
+        else if (pa >= PADDR(pages) && pa < PADDR(pages) + PTSIZE) {
+            va = pa - PADDR(pages) + UPAGES;
+        } else {
+            cprintf(" 0x????????\n");
+            continue;
+        }
+
+        pteptr = pgdir_walk(kern_pgdir, (const void *)va, 0);
+        if (!pteptr || !(*pteptr & PTE_P)) {
+            cprintf(" 0x????????\n");
+        } else {
+            cprintf(" 0x%08x\n", *(int*)va);
+        }
+    }
 }

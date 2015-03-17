@@ -25,7 +25,9 @@ struct Command {
 static struct Command commands[] = {
 	{ "help", "Display this list of commands", mon_help },
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
-	{ "showmappings", "Display information about page mappings between [start_va, end_va]", mon_showmappings }
+	{ "showmappings", "Display information about page mappings between [start_va, end_va]", mon_showmappings },
+	{ "setperm", "Set permission for the given virtual addr", mon_setperm },
+	{ "dump", "Dump the content of the given region", mon_dump}
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
@@ -136,6 +138,55 @@ showmappings_bad:
 	return -1;
 }
 
+int
+mon_setperm(int argc, char **argv, struct Trapframe *tf)
+{
+	uintptr_t va;
+	int perm;
+
+	if (argc != 3)
+		goto setperm_bad;
+
+	va = strtol(argv[1], NULL, 0);
+	perm = strtol(argv[2], NULL, 0);
+
+	if (perm >= 0x1000)
+		goto setperm_bad;
+
+	setperm(va, perm);
+	return 0;
+setperm_bad:
+	cprintf("setperm: \033[31millegal arguments\033[0m\n");
+	cprintf("usage: setperm va perm (Eg. setperm 0xf0000000 0x001), /"
+	         "the value of each permission is defined in 'inc/mmu.h\n'");
+	return -1;
+}
+
+int
+mon_dump(int argc, char **argv, struct Trapframe *tf)
+{
+	uintptr_t start_va, end_va;
+	physaddr_t start_pa, end_pa;
+	if (argc != 4)
+		goto dump_bad;
+	if (strlen(argv[1]) != 2 || argv[1][0] != '-' || !(argv[1][1] == 'v' || argv[1][1] == 'p'))
+		goto dump_bad;
+	if (argv[1][1] == 'v') {
+		start_va = strtol(argv[2], NULL, 0);
+		end_va = strtol(argv[3], NULL, 0);
+		dump_virtaddr(start_va, end_va);
+	} else {
+		start_pa = strtol(argv[2], NULL, 0);
+		end_pa = strtol(argv[3], NULL, 0);
+		dump_physaddr(start_pa, end_pa);
+	}
+
+	return 0;
+dump_bad:
+	cprintf("dump: \033[31millegal arguments\033[0m\n");
+	cprintf("usage: dump -{v,p} start_addr end_addr. -v for virtual address, -p for physical address\n");
+	return -1;
+}
 /***** Kernel monitor command interpreter *****/
 
 #define WHITESPACE "\t\r\n "
@@ -196,3 +247,4 @@ monitor(struct Trapframe *tf)
 				break;
 	}
 }
+
