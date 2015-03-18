@@ -2,19 +2,18 @@ Lab 2: Memory Management实习报告
 ===================
 1100016639 信息科学技术学院 吕鑫
 
+---
 
-
-
+目录
+-------------
+<!--toc-->
 
 
 ----
 总体概述
 -------------
 
-// TODO
- 
-
-
+本次Lab针对内存管理，从物理页管理，到建立页表，再到内核地址映射，逐步建立起整个虚存系统。
 
 
 ----
@@ -24,14 +23,14 @@ Lab 2: Memory Management实习报告
 
 ### 任务完成列表
 
-|Exercise 1|Exercise 2|Exercise 3|Exercise 4|Exercise 5|Exercise 6|
-|:--:|:--:|:--:|:--:|:--:|:--:|
-|√   | √  | √  | √  | √  | √  |
+|Exercise 1|Exercise 2|Exercise 3|Exercise 4|Exercise 5|
+|:--:|:--:|:--:|:--:|:--:|
+|√   | √  | √  | √  | √  |
 
 
-|Exercise 7|Exercise 8| Challenge | Exercise 9|Exercise 10|Exercise 11|
-|:--:|:--:|:--:|:--:|:--:|:--:|
-|√   | √  | √  | √  | √  |√  |
+|Challenge 1|Challenge 2| Challenge 3 | Challenge 4|
+|:--:|:--:|:--:|:--:|
+|√   | √  | √  | √  |
 
 
 ----
@@ -48,7 +47,7 @@ Lab 2: Memory Management实习报告
 - Boot Loader加载内核ELF Header至`0x1000`处，根据Header信息读取内核的每一节到内存中。目前为止还是处于**Low Memory区**
 - Boot Loader读取完内核到内存中，跳转到`0x10000c`处开始执行内核代码，这部分代码处于**Extended Memory**区
 - 开始执行内核代码后，上述Boot Loader、内核的ELF Header等就不再需要了，作为空闲内存可被分配
-- 内存的第一页（`0x0000`~`0x1000`）被用作存储中断描述符表IDT
+- 物理内存的第一页（`0x0000`~`0x1000`）被用作存储中断描述符表IDT
 
 综上，我们可以画出内核加载完之后的物理内存分布：
 
@@ -70,9 +69,10 @@ Lab 2: Memory Management实习报告
 
 1. `boot_alloc()`
 
- 此函数在内核初始化虚存系统时，用于申请内存。参数n是要申请的字节数，返回值是申请到的内存地址。因此，按照注释的提示，简单地返回当前的`nextfree`值，并更新nextfree值为`ROUND(nextfree+n, PGSIZE)`即可。
 
- ```c
+   	此函数在内核初始化虚存系统时，用于申请内存。参数n是要申请的字节数，返回值是申请到的内存地址。因此，按照注释的提示，简单地返回当前的`nextfree`值，并更新nextfree值为`ROUND(nextfree+n, PGSIZE)`即可。
+
+	```c
 static void *
 boot_alloc(uint32_t n)
 {
@@ -99,14 +99,14 @@ boot_alloc(uint32_t n)
 
 	return result;
 }
- ```
+	```
 
 2. `mem_init()`
 
 	 这个函数有两个主要功能：**初始化页表**和**内存映射**，当然在exercise 1中只需要完成页表的初始化就可以了。
 
      要补充的代码段如下，申请了一段内存空间用于储存页表，并全部清零：
- ```
+ 	```
 	//////////////////////////////////////////////////////////////////////
 	// Allocate an array of npages 'struct PageInfo's and store it in 'pages'.
 	// The kernel uses this array to keep track of physical pages: for
@@ -116,49 +116,50 @@ boot_alloc(uint32_t n)
 	// Your code goes here:
 	pages = (struct PageInfo *) boot_alloc(sizeof(struct PageInfo) * npages);
 	memset(pages, 0, sizeof(struct PageInfo) * npages);
- ```
+ 	```
 
 3. `page_alloc()`
   
-  这个函数为每个页面的`PageInfo`结构进行初始化，并建立起空闲页链表`page_free_list`。
+   	这个函数为每个页面的`PageInfo`结构进行初始化，并建立起空闲页链表`page_free_list`。
 
-  为此我们需要理清那些内存是已被占用的，哪些是可用的。根据上文的内存分布情况可知：
-- 第一页（`[0, PGSIZE)`）已被占用，用于中断描述符表等其他BIOS结构
-- 第二页到**IO Hole**中间的这一段（`[PGSIZE, npages_basemem * PGSIZE)`）内存可用
-- **IO Hole**（`[IOPHYSMEM, EXTPHYSMEM`）不可用
-- 内核数据结构（页表等）已占用的内存段不可用
+   	为此我们需要理清那些内存是已被占用的，哪些是可用的。根据上文的内存分布情况可知：
 
-  前三项都有明确的变量、宏帮助定位，而第四项如何确定呢？只需要`boot_alloc(0)`即可，它会返回当前下一块空闲内存的初始地址（虚拟地址），我们将这个地址减去`KERNBASE`，就知道内核当前占用了多少内存了。再然后，目前的内存映射机制是把虚拟地址`[KERNBASE, KERNBASE + 4MB)`映射到物理地址`[0, 4MB)`上，所以这个差值实际上就是下一块空闲内存的实际物理地址。
+	- 第一页（`[0, PGSIZE)`）已被占用，用于中断描述符表等其他BIOS结构
+	- 第二页到**IO Hole**中间的这一段（`[PGSIZE, npages_basemem * PGSIZE)`）内存可用
+	- **IO Hole**（`[IOPHYSMEM, EXTPHYSMEM`）不可用
+	- 内核数据结构（页表等）已占用的内存段不可用
 
-  综上，对于空闲内存，我们初始化它的引用数为0，并加入到空闲链表中。而已占用的内存，根据注释，它们的引用数没有意义，无需初始化。具体代码如下：
+  	前三项都有明确的变量、宏帮助定位，而第四项如何确定呢？只需要`boot_alloc(0)`即可，它会返回当前下一块空闲内存的初始地址（虚拟地址），我们将这个地址减去`KERNBASE`，就知道内核当前占用了多少内存了。再然后，目前的内存映射机制是把虚拟地址`[KERNBASE, KERNBASE + 4MB)`映射到物理地址`[0, 4MB)`上，所以这个差值实际上就是下一块空闲内存的实际物理地址。
+
+  	综上，对于空闲内存，我们初始化它的引用数为0，并加入到空闲链表中。而已占用的内存，根据注释，它们的引用数没有意义，无需初始化。具体代码如下：
   
-  ```c
-  void
+  	```c
+void
 page_init(void)
 {
-		size_t i;
-		// [PGSIZE, npages_basemem * PGSIZE) is free
-		for (i = 1; i < npages_basemem; ++i) {
-			pages[i].pp_ref = 0;
-			pages[i].pp_link = page_free_list;
-			page_free_list = &pages[i];
-		}
-		// boot_alloc(0) denotes the start virtual address of the current free mem
-		for (i = ((uint32_t)boot_alloc(0) - KERNBASE) / PGSIZE; i < npages; ++i) {
-			pages[i].pp_ref = 0;
-			pages[i].pp_link = page_free_list;
-			page_free_list = &pages[i];
-		}
+	size_t i;
+	// [PGSIZE, npages_basemem * PGSIZE) is free
+	for (i = 1; i < npages_basemem; ++i) {
+		pages[i].pp_ref = 0;
+		pages[i].pp_link = page_free_list;
+		page_free_list = &pages[i];
+	}
+	// boot_alloc(0) denotes the start virtual address of the current free mem
+	for (i = ((uint32_t)boot_alloc(0) - KERNBASE) / PGSIZE; i < npages; ++i) {
+		pages[i].pp_ref = 0;
+		pages[i].pp_link = page_free_list;
+		page_free_list = &pages[i];
+	}
 }
-  ```
+  	```
 
 4. `page_alloc()`
 
-  这个函数的作用是从空闲链表中分配一页物理页。参数`alloc_flag`指明是否要清空页面。
+  	这个函数的作用是从空闲链表中分配一页物理页。参数`alloc_flag`指明是否要清空页面。
 
-  功能非常直观，容易实现，代码如下：
-  
-  ```c
+  	功能非常直观，容易实现，代码如下：
+  	
+  	```c
 struct PageInfo *
 page_alloc(int alloc_flags)
 {
@@ -175,30 +176,29 @@ page_alloc(int alloc_flags)
                 memset(page2kva(pp), 0, PGSIZE);
         return pp;
 }
-  ```
+  	```
 
 5. `page_free()`
   
-  这个函数释放一个物理页，只需先检查该页是否可以释放，之后将其插入空闲链表中即可，代码如下：
-  
-  ```c
-  void
+	  这个函数释放一个物理页，只需先检查该页是否可以释放，之后将其插入空闲链表中即可，代码如下：
+	  
+	  ```c
+void
 page_free(struct PageInfo *pp)
 {
-        // Hint: You may want to panic if pp->pp_ref is nonzero or
-        // pp->pp_link is not NULL.
-        if (pp->pp_ref || pp->pp_link) {
-                cprintf("%d %p\n", pp->pp_ref, pp->pp_link);
-                panic("page_free: Invalid page to free!");
-                return;
-        }
+    // Hint: You may want to panic if pp->pp_ref is nonzero or
+    // pp->pp_link is not NULL.
+    if (pp->pp_ref || pp->pp_link) {
+            panic("page_free: Invalid page to free!");
+            return;
+    }
 
-        pp->pp_link = page_free_list;
-        page_free_list = pp;
+    pp->pp_link = page_free_list;
+    page_free_list = pp;
 }
-  ```
-  
-  至此Part 1全部完成，能通过`check_page_alloc()`函数了。
+	  ```
+	  
+	  至此Part 1全部完成，能通过`check_page_alloc()`函数了。
 
 ----
 ### Part 2: Virtual Memory
@@ -417,7 +417,7 @@ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 -----
 ### Part 3: Kernel Address Space
 
-这一部分最终完成地址的映射，构件好整个虚拟地址空间`[0, 4GB)`的映射，并开始实行完整的分页机制。
+这一部分最终完成地址的映射，构建好整个虚拟地址空间`[0, 4GB)`的映射，并开始实行完整的分页机制。
 
 `inc/memlayout.h`里对整个虚拟地址空间的划分有完整的描述：
 
@@ -498,14 +498,14 @@ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 
  利用QEMU Monitor的`info pg`命令，可以很清楚地看到哪几个Page Directory已经有了值，就可以轻松填写该表格了。
 
-<img src="http://ww4.sinaimg.cn/large/69cb49bcjw1eq90yt9i6qj20mc0ev0w4.jpg" width="70%" />
+ <img src="http://ww4.sinaimg.cn/large/69cb49bcjw1eq6cnqmd84j20mc0evdjf.jpg" width="70%"/>
 
  Entry	| Base Virtual Address	| Points to (logically) |
 |:--- | :--- | :---
 1023	| 0xffc00000	| Page table for top 4MB of phys memory
 ...| ... | ...
 960	| 0xf0000000	| Page table for `[0x0, 0x003fffff)` phys memory 
-959	| 0xefc00000	| Page table for kernel stack 
+959	| 0xefc00000	| **Kernel Stack** 
 958	| 0xef800000	|?
 957 | 0xef400000 | **Cur page table** |  
 956 | 0xef000000 | **RO PAGES**
@@ -655,9 +655,9 @@ Score: 70/70
 
 ----
 ##### Challenge 2
-> **Extend the JOS kernel monitor with commands to:**
+> Extend the JOS kernel monitor with commands to:
  
-
+----
 
 > Display in a useful and easy-to-read format all of the physical page mappings (or lack thereof) that apply to a particular range of virtual/linear addresses in the currently active address space. For example, you might enter **showmappings 0x3000 0x5000** to display the physical page mappings and corresponding permission bits that apply to the pages at virtual addresses 0x3000, 0x4000, and 0x5000.
 
@@ -712,7 +712,7 @@ show_map_region(uintptr_t start_va, uintptr_t end_va)
 
 <img src="http://ww3.sinaimg.cn/large/69cb49bcjw1eq8khqwnifj20mc0ev42q.jpg" width="70%"/>
 
-
+----
 >  Explicitly set, clear, or change the permissions of any mapping in the current address space.
 
 跟之前一样，在`monitor.c`中建立`mon_setperm()`检查参数，调用`pmap.c`中的`setperm()`来实现。实现很简单，用`pgdir_walk()`找到对应的pte，直接更改权限即可。
@@ -764,6 +764,7 @@ setperm(uintptr_t va, int perm)
 
 <img src="http://ww3.sinaimg.cn/large/69cb49bcjw1eq8np8wrbij20j00evdhl.jpg" width="70%"/>
 
+----
 > Dump the contents of a range of memory given either a virtual or physical address range. Be sure the dump code behaves correctly when the range extends across page boundaries!
 
 对于虚拟地址很简单，检查该虚拟地址所在页的`PTE_P`是否被设置，若被设置则直接输出该地址上的值即可。
@@ -829,7 +830,7 @@ dump_physaddr(physaddr_t start_pa, physaddr_t end_pa)
 
 <img src="http://ww4.sinaimg.cn/large/69cb49bcgw1eq8ph5ukb7j20j00evdhz.jpg" width="70%"/>
 
-
+----
 > Do anything else that you think might be useful later for debugging the kernel. (There's a good chance it will be!)
 
 I think nothing else might be useful later.
@@ -842,8 +843,15 @@ I think nothing else might be useful later.
 ##### Challenge 3
 > Write up an outline of how a kernel could be designed to allow user environments unrestricted use of the full 4GB virtual and linear address space. Hint: the technique is sometimes known as "follow the bouncing kernel." In your design, be sure to address exactly what has to happen when the processor transitions between kernel and user modes, and how the kernel would accomplish such transitions. Also describe how the kernel would access physical memory and I/O devices in this scheme, and how the kernel would access a user environment's virtual address space during system calls and the like. Finally, think about and describe the advantages and disadvantages of such a scheme in terms of flexibility, performance, kernel complexity, and other factors you can think of.
 
-I can think of nothing.
+毫无办法。
 
+参考了[https://github.com/cmjones/jos-mmap/blob/master/answers-lab2.txt](https://github.com/cmjones/jos-mmap/blob/master/answers-lab2.txt)
+
+他的方法大致就是：每次用户态发生中断，去查看中断描述符表时，这时候内核设计为让**中断描述符表(IDT)**所在页移动到另一个虚拟地址，把原来它的虚拟地址空出来给用户。由于移动的位置可以是任意的，这样理论上用户态就能访问所有4GB的虚拟地址空间。
+
+但是我觉得这种设计的效果会非常差，这样每次发生一个中断的时候，代价会非常大，搞不好晃一下鼠标都要卡。。但是想法还是值得学习的。
+
+-----
 ##### Challenge 4
 > Since our JOS kernel's memory management system only allocates and frees memory on page granularity, we do not have anything comparable to a general-purpose **malloc/free** facility that we can use within the kernel. This could be a problem if we want to support certain types of I/O devices that require physically contiguous buffers larger than 4KB in size, or if we want user-level environments, and not just the kernel, to be able to allocate and map 4MB superpages for maximum processor efficiency. (See the earlier challenge problem about **PTE_PS**.)
 
@@ -856,7 +864,11 @@ I can think of nothing.
 ----
 感想与收获
 -------------
-煞笔Lab解散算了
+这次Lab涉及内存管理，难度比第一次大。刚拿到Lab 2的代码时很头疼，需要理清各个文件、各个函数的相互关系，想清楚页表到底是如何建立起来的。好在MIT的教授特别善良，在代码里有非常详尽的注释，很大程度上帮助了我完成Lab。
+
+至于Challenge，除了第二个challenge，其它都非常的challenging。第一题需要阅读Intel手册查阅大量资料才能做；第三题读下来根本毫无头绪，网上资料也少之又少；第四题虽然很容易想到做法，但是那一刻，我终于回想起了，曾经一度被Memory Lab支配的恐怖，还有囚禁于Segment Fault的那份屈辱，因此根本没想过去实现它。。
+
+总之，Lab 2做完了，已经没有什么好害怕的了，这时只要微笑就可以了。
 
 ---
 参考资料
