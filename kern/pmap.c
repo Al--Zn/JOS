@@ -90,7 +90,8 @@ boot_alloc(uint32_t n)
     // to any kernel code or global variables.
     if (!nextfree) {
         extern char end[];
-        nextfree = ROUNDUP((char *) end, PGSIZE);
+        nextfree = ROUNDUP((char *) end, PGSIZE);       
+        cprintf("nextfree: %x\n", (uint32_t)nextfree);
     }
 
     // Allocate a chunk large enough to hold 'n' bytes, then update
@@ -570,7 +571,21 @@ int
 user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 {
 	// LAB 3: Your code here.
+    pte_t *pte;
+    void *begin = (void *)(uint32_t)va;
+    void *end = ROUNDUP(begin + len, PGSIZE);
+    begin = ROUNDDOWN(begin, PGSIZE);
 
+    for (; begin != end; begin += PGSIZE) {
+        pte = pgdir_walk(env->env_pgdir, begin, 0);
+        if (!pte || !(*pte & PTE_P) || !((*pte & perm) == perm)) {
+            if (begin == ROUNDDOWN((void *)(uint32_t)va, PGSIZE))
+                user_mem_check_addr = (uintptr_t) va;
+            else
+                user_mem_check_addr = (uintptr_t) begin;
+            return -E_FAULT;
+        }
+    }
 	return 0;
 }
 
