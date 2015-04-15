@@ -55,7 +55,7 @@ TRAPHANDLER(name, num)
 TRAPHANDLER_NOEC(name, num)
 
 #define TRAPELEMENT_NONE()						\
-.data;									\
+.data;								        \
 	.long 0;								
 
 
@@ -65,6 +65,7 @@ TRAPHANDLER_NOEC(name, num)
 	.globl handlers
 handlers:
 .text
+
 /*
  * Lab 3: Your code here for generating entry points for the different traps.
  */
