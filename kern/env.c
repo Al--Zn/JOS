@@ -389,7 +389,6 @@ env_create(uint8_t *binary, enum EnvType type)
 		panic("env_create: %e", -E_NO_FREE_ENV);
 	load_icode(e, binary);
 	e->env_type = type;
-	cprintf("env_create finished.\n");
 }
 
 //
