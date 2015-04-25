@@ -62,6 +62,10 @@ struct PageInfo *page_lookup(pde_t *pgdir, void *va, pte_t **pte_store);
 void	page_decref(struct PageInfo *pp);
 
 void	tlb_invalidate(pde_t *pgdir, void *va);
+void show_map_region(uintptr_t start_va, uintptr_t end_va);
+void setperm(uintptr_t va, int perm);
+void dump_virtaddr(uintptr_t start_va, uintptr_t end_va);
+void dump_physaddr(physaddr_t start_pa, physaddr_t end_va);
 
 void *	mmio_map_region(physaddr_t pa, size_t size);
 

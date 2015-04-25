@@ -42,11 +42,56 @@
 	pushl $(num);							\
 	jmp _alltraps
 
+
+#define TRAPELEMENT(name, num)						\
+.data;									\
+	.long name; 							\
+.text;									\
+TRAPHANDLER(name, num)
+
+#define TRAPELEMENT_NOEC(name, num)					\
+.data;									\
+	.long name; 							\
+.text;									\
+TRAPHANDLER_NOEC(name, num)
+
+#define TRAPELEMENT_NONE()						\
+.data;								        \
+	.long 0;								
+
+
+
+.data
+	.p2align 2
+	.globl handlers
+handlers:
 .text
 
 /*
  * Lab 3: Your code here for generating entry points for the different traps.
  */
+TRAPELEMENT_NOEC(trap0, 0)
+TRAPELEMENT_NOEC(trap1, 1)
+TRAPELEMENT_NOEC(trap2, 2)
+TRAPELEMENT_NOEC(trap3, 3)
+TRAPELEMENT_NOEC(trap4, 4)
+TRAPELEMENT_NOEC(trap5, 5)
+TRAPELEMENT_NOEC(trap6, 6)
+TRAPELEMENT_NOEC(trap7, 7)
+TRAPELEMENT(trap8, 8)
+TRAPELEMENT_NONE()
+TRAPELEMENT(trap10, 10)
+TRAPELEMENT(trap11, 11)
+TRAPELEMENT(trap12, 12)
+TRAPELEMENT(trap13, 13)
+TRAPELEMENT(trap14, 14)
+TRAPELEMENT_NONE()
+TRAPELEMENT_NOEC(trap16, 16)
+TRAPELEMENT(trap17, 17)
+TRAPELEMENT_NOEC(trap18, 18)
+TRAPELEMENT_NOEC(trap19, 19)
+
+TRAPHANDLER_NOEC(trap48, 48)
 
 
 
@@ -54,3 +99,12 @@
  * Lab 3: Your code here for _alltraps
  */
 
+_alltraps:
+	pushl %ds
+	pushl %es
+	pushal
+	movl $GD_KD, %eax
+	movw %ax, %ds
+	movw %ax, %es
+	pushl %esp
+	call trap
