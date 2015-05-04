@@ -42,7 +42,7 @@ Lab 4: Preemptive Multitasking实习报告
 #### Exercise 1
 > Implement `mmio_map_region` in `kern/pmap.c`. To see how this is used, look at the beginning of `lapic_init` in `kern/lapic.c`. You'll have to do the next exercise, too, before the tests for `mmio_map_region` will run.
 
-```
+```C
 void *
 mmio_map_region(physaddr_t pa, size_t size)
 {
@@ -64,7 +64,7 @@ mmio_map_region(physaddr_t pa, size_t size)
 
 在分配前面`[PGSIZE, npages_basemem * PGSIZE)`时，利用`pa2page`判断是否为`MPENTRY_ADDR`所在的一页即可。
 
-```
+```C
     size_t i;
 	struct PageInfo *pp = pa2page(MPENTRY_PADDR);
     // [PGSIZE, npages_basemem * PGSIZE) is free
@@ -89,7 +89,7 @@ mmio_map_region(physaddr_t pa, size_t size)
 #### Exercise 4
 > Modify `mem_init_mp()` (in `kern/pmap.c`) to map per-CPU stacks starting at `KSTACKTOP`, as shown in `inc/memlayout.h`. The size of each stack is `KSTKSIZE` bytes plus `KSTKGAP` bytes of unmapped guard pages. Your code should pass the new check in `check_kern_pgdir()`.
 
-```
+```C
 static void
 mem_init_mp(void)
 {
@@ -242,7 +242,7 @@ sys_page_alloc(envid_t envid, void *va, int perm)
 
 ##### 4. `sys_page_map()`:
 
-```
+```C
 static int
 sys_page_map(envid_t srcenvid, void *srcva,
 	     envid_t dstenvid, void *dstva, int perm)
@@ -276,7 +276,7 @@ sys_page_map(envid_t srcenvid, void *srcva,
 
 ##### 5. `sys_page_unmap()`:
 
-```
+```C
 static int
 sys_page_unmap(envid_t envid, void *va)
 {
@@ -298,7 +298,7 @@ sys_page_unmap(envid_t envid, void *va)
 #### Exercise 8
 > Implement the `sys_env_set_pgfault_upcall` system call. Be sure to enable permission checking when looking up the environment ID of the target environment, since this is a "dangerous" system call.
 
-```
+```C
 static int
 sys_env_set_pgfault_upcall(envid_t envid, void *func)
 {
@@ -317,7 +317,7 @@ sys_env_set_pgfault_upcall(envid_t envid, void *func)
 #### Exercise 9
 > Implement the code in `page_fault_handler` in `kern/trap.c` required to dispatch page faults to the user-mode handler. Be sure to take appropriate precautions when writing into the exception stack. (What happens if the user environment runs out of space on the exception stack?)
 
-```
+```C
 void
 page_fault_handler(struct Trapframe *tf)
 {
@@ -363,7 +363,7 @@ page_fault_handler(struct Trapframe *tf)
 #### Exercise 10
 > Implement the `_pgfault_upcall` routine in `lib/pfentry.S`. The interesting part is returning to the original point in the user code that caused the page fault. You'll return directly there, without going back through the kernel. The hard part is simultaneously switching stacks and re-loading the EIP.
 
-```
+```C
 	// Now the C page fault handler has returned and you must return
 	// to the trap time state.
 	// Push trap-time %eip onto the trap-time stack.
@@ -392,7 +392,7 @@ page_fault_handler(struct Trapframe *tf)
 #### Exercise 11
 > Finish `set_pgfault_handler()` in `lib/pgfault.c`.
 
-```
+```C
 void
 set_pgfault_handler(void (*handler)(struct UTrapframe *utf))
 {
@@ -422,7 +422,7 @@ set_pgfault_handler(void (*handler)(struct UTrapframe *utf))
 
 `fork()`:
 
-```
+```C
 envid_t
 fork(void)
 {
@@ -469,7 +469,7 @@ fork(void)
 
 `duppage()`:
 
-```
+```C
 static int
 duppage(envid_t envid, unsigned pn)
 {
@@ -496,7 +496,8 @@ duppage(envid_t envid, unsigned pn)
 ```
 
 `pgfault()`:
-```
+
+```C
 static void
 pgfault(struct UTrapframe *utf)
 {
