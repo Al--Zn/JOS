@@ -533,3 +533,141 @@ pgfault(struct UTrapframe *utf)
 ```
 
 ----
+
+### Part C: Preemptive Multitasking and Inter-Process communication (IPC)
+
+#### Exercise 13
+
+> Modify `kern/trapentry.S` and `kern/trap.c` to initialize the appropriate entries in the IDT and provide handlers for IRQs 0 through 15. Then modify the code in `env_alloc()` in kern/env.c to ensure that user environments are always run with interrupts enabled.
+
+按照Lab 3注册中断的做法一样来即可，这里不再赘述。
+
+随后在`env_alloc()`中设置eflags的`FL_IF`位来开启外部中断。
+
+-----
+
+#### Exercise 14
+
+> Modify the kernel's `trap_dispatch()` function so that it calls `sched_yield()` to find and run a different environment whenever a clock interrupt takes place.
+
+在`trap_dispatch()`中根据`trapno`的分配中新加一个case，注意要加上`IRQ_OFFSET`：
+
+```
+	case IRQ_OFFSET + IRQ_TIMER:
+		lapic_eoi();
+		sched_yield();
+		return;
+```
+
+-----
+
+#### Exercise 15
+
+> Implement `sys_ipc_recv` and `sys_ipc_try_send` in `kern/syscall.c`. Read the comments on both before implementing them, since they have to work together. When you call envid2env in these routines, you should set the checkperm flag to 0, meaning that any environment is allowed to send IPC messages to any other environment, and the kernel does no special permission checking other than verifying that the target envid is valid.
+
+1. `sys_ipc_recv()`
+
+```
+static int
+sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
+{
+	// LAB 4: Your code here.
+	struct Env *e;
+	struct PageInfo *pp;
+	pte_t *pte;
+	int r;
+	if ((r = envid2env(envid, &e, 0)) < 0) {
+		return r;
+	}
+	if (!e->env_ipc_recving)
+		return -E_IPC_NOT_RECV;
+	e->env_ipc_perm = 0;
+	if ((uint32_t) srcva < UTOP) {
+		if ((uint32_t) srcva % PGSIZE)
+			return -E_INVAL;
+		if ((perm & (PTE_U | PTE_P)) != (PTE_U | PTE_P) || perm & ~PTE_SYSCALL)
+			return -E_INVAL;		
+		pp = page_lookup(curenv->env_pgdir, srcva, &pte);
+		if (!pp) {
+			return -E_INVAL;
+		}
+		if ((perm & PTE_W) && !(*pte & PTE_W)) {
+			return -E_INVAL;
+		}
+		if ((r = page_insert(e->env_pgdir, pp, e->env_ipc_dstva, perm)) < 0)
+			return r;
+		e->env_ipc_perm = perm;
+	}
+
+	// Successfully Sent
+	e->env_ipc_recving = 0;
+	e->env_ipc_from = curenv->env_id;
+	e->env_ipc_value = value;
+	e->env_tf.tf_regs.reg_eax = 0;
+	e->env_status = ENV_RUNNABLE;
+	return 0;
+}
+```
+
+2. `sys_ipc_recv()`
+
+```
+static int
+sys_ipc_recv(void *dstva)
+{
+	// LAB 4: Your code here.
+	if ((uint32_t) dstva < UTOP && (uint32_t) dstva % PGSIZE) {
+		return -E_INVAL;
+	}
+	curenv->env_ipc_recving = 1;
+	curenv->env_ipc_dstva = dstva;
+	curenv->env_status = ENV_NOT_RUNNABLE;
+	sched_yield();
+	return 0;
+}
+```
+
+3. `ipc_send()`
+
+```
+void
+ipc_send(envid_t to_env, uint32_t val, void *pg, int perm)
+{
+	// LAB 4: Your code here.
+	void *va = pg ? pg : (void *) UTOP;
+	int r;
+
+	while ((r = sys_ipc_try_send(to_env, val, va, perm)) < 0) {
+		if (r != -E_IPC_NOT_RECV) {
+			panic("ipc_send error");
+		}
+		sys_yield();
+	}
+}
+```
+
+4. `ipc_recv()`
+
+```
+int32_t
+ipc_recv(envid_t *from_env_store, void *pg, int *perm_store)
+{
+	// LAB 4: Your code here.
+	void *va = pg ? pg : (void *) UTOP;
+	int r;
+	if ((r = sys_ipc_recv(va)) < 0) {
+		if (from_env_store)
+			*from_env_store = 0;
+		if (perm_store)
+			*perm_store = 0;
+		return r;
+	}
+
+	if (from_env_store)
+		*from_env_store = thisenv->env_ipc_from;
+	if (perm_store)
+		*perm_store = thisenv->env_ipc_perm;
+
+	return thisenv->env_ipc_value;
+}
+```
