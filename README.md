@@ -552,7 +552,7 @@ pgfault(struct UTrapframe *utf)
 
 在`trap_dispatch()`中根据`trapno`的分配中新加一个case，注意要加上`IRQ_OFFSET`：
 
-```
+```C
 	case IRQ_OFFSET + IRQ_TIMER:
 		lapic_eoi();
 		sched_yield();
@@ -567,7 +567,7 @@ pgfault(struct UTrapframe *utf)
 
 1. `sys_ipc_recv()`
 
-```
+```C
 static int
 sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 {
@@ -611,7 +611,7 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 
 2. `sys_ipc_recv()`
 
-```
+```C
 static int
 sys_ipc_recv(void *dstva)
 {
@@ -629,7 +629,7 @@ sys_ipc_recv(void *dstva)
 
 3. `ipc_send()`
 
-```
+```C
 void
 ipc_send(envid_t to_env, uint32_t val, void *pg, int perm)
 {
@@ -648,7 +648,7 @@ ipc_send(envid_t to_env, uint32_t val, void *pg, int perm)
 
 4. `ipc_recv()`
 
-```
+```C
 int32_t
 ipc_recv(envid_t *from_env_store, void *pg, int *perm_store)
 {
