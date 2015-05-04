@@ -124,7 +124,7 @@ mem_init_mp(void)
 #### Exercise 6
 > Implement round-robin scheduling in `sched_yield()` as described above. Don't forget to modify `syscall()` to dispatch `sys_yield()`.
 
-```
+```C
 void
 sched_yield(void)
 {
