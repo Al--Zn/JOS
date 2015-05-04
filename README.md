@@ -164,7 +164,7 @@ sched_yield(void)
 
 保存现场的过程是在发生中断的时候完成的，在`trap()`中拷贝了一份Trapframe：
 
-```
+```C
 		// Copy trap frame (which is currently on the stack)
 		// into 'curenv->env_tf', so that running the environment
 		// will restart at the trap point.
@@ -179,7 +179,7 @@ sched_yield(void)
 
 ##### 1. `sys_exofork()`:
 
-```
+```C
 static envid_t
 sys_exofork(void)
 {
@@ -197,7 +197,7 @@ sys_exofork(void)
 
 ##### 2. `sys_env_set_status()`:
 
-```
+```C
 static int
 sys_env_set_status(envid_t envid, int status)
 {
@@ -214,7 +214,7 @@ sys_env_set_status(envid_t envid, int status)
 ```
 ##### 3. `sys_page_alloc()`:
 
-```
+```C
 static int
 sys_page_alloc(envid_t envid, void *va, int perm)
 {
