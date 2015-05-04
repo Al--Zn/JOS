@@ -26,14 +26,13 @@ pgfault(struct UTrapframe *utf)
 
 	// LAB 4: Your code here.
 	
-	// cprintf("PAGE FAULT HANDLER, 0x%08x %d\n", (uint32_t)addr, err & FEC_WR);
 	
 	if ((err & FEC_WR) == 0)
-		panic("pgfault, the fault is not a write\n");
+		panic("pgfault, not a write fault. va: 0x%x\n", addr);
 
 	uint32_t uaddr = (uint32_t) addr;
 	if ((uvpd[PDX(addr)] & PTE_P) == 0 || (uvpt[uaddr / PGSIZE] & PTE_COW) == 0) {
-		panic("pgfault, not a copy-on-write page\n");
+		panic("pgfault, not a copy-on-write page. va: 0x%x\n", addr);
 	}
 
 	// Allocate a new page, map it at a temporary location (PFTEMP),
@@ -45,11 +44,9 @@ pgfault(struct UTrapframe *utf)
 
 	// LAB 4: Your code here.
 
-	// static int sys_page_alloc(envid_t envid, void *va, int perm)
 	r = sys_page_alloc(0, (void *)PFTEMP, PTE_W | PTE_U | PTE_P);
 	if (r < 0) panic("pgfault, sys_page_alloc error : %e\n", r);
 
-	// Oh my god, I forget this at the first, it waste me a lot of time to debug!!!
 	addr = ROUNDDOWN(addr, PGSIZE);
 	
 	memcpy(PFTEMP, addr, PGSIZE);
@@ -131,23 +128,14 @@ fork(void)
 	}
 	// We're the parent
 	// Duplicate the pages mapping first
-	// 	cprintf("PGNUM: %x\n", PGNUM(UTOP));
+	// We must check uvpd FIRST!!! Otherwise uvpt would page fault!!!
+	// It takes me a long time to debug this stupid bug!!!
 
-	// for (i = 0; i < PGNUM(UTOP); ++i) {
-	// 	if ((uvpt[i] & PTE_P) && (uvpt[i] & PTE_U) && (uvpd[PDX(i << 12)] & PTE_P)) {
-	// 		cprintf("%x\n", PDX(i * PGSIZE));
-	// 		cprintf("%x\n", i);
-	// 		duppage(envid , i);
-
-	// 	}
-	// }
-	cprintf("PGNUM: %x\n", PGNUM(UTOP));
-	for (i = 0; i != UTOP; i += PGSIZE) 
-		if ((uvpd[PDX(i)] & PTE_P) && (uvpt[i / PGSIZE] & PTE_P) && (uvpt[i / PGSIZE] & PTE_U)) {
-			//cprintf("%d\n", PDX(i));
-			//cprintf("%d\n", i / PGSIZE);
-			duppage(envid, i / PGSIZE);
+	for (i = 0; i < PGNUM(UTOP); ++i) {
+		if ((uvpd[PDX(i << 12)] & PTE_P) && (uvpt[i] & PTE_P) && (uvpt[i] & PTE_U)) {
+			duppage(envid , i);
 		}
+	}
 
 	// Allocate the space for user exception stack
 	if ((r = sys_page_alloc(envid, (void *) (UXSTACKTOP - PGSIZE), PTE_P|PTE_U|PTE_W)) < 0)
