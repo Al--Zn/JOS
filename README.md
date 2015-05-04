@@ -85,8 +85,10 @@ mmio_map_region(physaddr_t pa, size_t size)
 题目里已经提示，`mpentry.S`编译链接都是在`KERNBASE`上的内存地址上进行的，此时还处于**实模式**中，`mpentry.S`中的符号地址全部处于高地址。为了使代码能在`MPENTRY_PADDR`的低地址成功运行，需要在`mpentry.S`中需要将这些高地址转变为低地址，这就是`MPBOOTPHYS`这个宏的作用。
 
 -----
+
 #### Exercise 4
 > Modify `mem_init_mp()` (in `kern/pmap.c`) to map per-CPU stacks starting at `KSTACKTOP`, as shown in `inc/memlayout.h`. The size of each stack is `KSTKSIZE` bytes plus `KSTKGAP` bytes of unmapped guard pages. Your code should pass the new check in `check_kern_pgdir()`.
+
 ```
 static void
 mem_init_mp(void)
@@ -103,13 +105,17 @@ mem_init_mp(void)
 ```
 
 -----
+
 #### Exercise 5
+
 > Apply the big kernel lock as described above, by calling `lock_kernel()` and `unlock_kernel()` at the proper locations.
 
 很简单，按照lab指示，在相应位置加上锁即可。
 
 ----
+
 #### Question 2
+
 > It seems that using the big kernel lock guarantees that only one CPU can run the kernel code at a time. Why do we still need separate kernel stacks for each CPU? Describe a scenario in which using a shared kernel stack will go wrong, even with the protection of the big kernel lock.
 
 中断发生时会自动压栈，而这时候还没有取得锁，若多个CPU同时发生中断，共享内核栈将会出错。
