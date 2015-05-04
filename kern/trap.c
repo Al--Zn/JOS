@@ -92,6 +92,12 @@ trap_init(void)
 	// void trap17();
 	// void trap18();
 	// void trap19();
+	void irq0();
+	void irq1();
+	void irq4();
+	void irq7();
+	void irq14();
+	void irq19();
 	void trap48();
 	extern int handlers[];
 	int i;
@@ -120,7 +126,18 @@ trap_init(void)
 	// SETGATE(idt[17], 0, GD_KT, trap17, 0);
 	// SETGATE(idt[18], 0, GD_KT, trap18, 0);
 	// SETGATE(idt[19], 0, GD_KT, trap19, 0);
+
+	// Set syscall gate
 	SETGATE(idt[48], 0, GD_KT, trap48, 3);
+
+	// Set irq gate
+	SETGATE(idt[32], 0, GD_KT, irq0, 0);
+	SETGATE(idt[33], 0, GD_KT, irq1, 0);
+	SETGATE(idt[36], 0, GD_KT, irq4, 0);
+	SETGATE(idt[39], 0, GD_KT, irq7, 0);
+	SETGATE(idt[46], 0, GD_KT, irq14, 0);
+	SETGATE(idt[51], 0, GD_KT, irq19, 0);
+
 
 	// Per-CPU setup 
 	trap_init_percpu();
@@ -248,6 +265,10 @@ trap_dispatch(struct Trapframe *tf)
 									  tf->tf_regs.reg_ebx,
 									  tf->tf_regs.reg_edi,
 									  tf->tf_regs.reg_esi);
+		return;
+	case IRQ_OFFSET + IRQ_TIMER:
+		lapic_eoi();
+		sched_yield();
 		return;
 	default:
 		cprintf("Trap-no: %s\n", trapname(tf->tf_trapno));
